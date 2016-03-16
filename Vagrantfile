@@ -28,8 +28,8 @@ Vagrant.configure(2) do |config|
       msiexec /passive /norestart /i C:\\Windows\\Temp\\DiegoWindows.msi CONSUL_IPS=#{pcfdev_public_ip} CF_ETCD_CLUSTER=http://#{pcfdev_public_ip}:4001 STACK=windows2012R2 REDUNDANCY_ZONE=windows LOGGREGATOR_SHARED_SECRET=loggregator-secret MACHINE_IP=#{local_public_ip} /log C:\\Windows\\Temp\\diegowindows.log
 
       # Download and install Garden
-      msiexec /passive /norestart /i C:\\Windows\\Temp\\GardenWindows.msi ADMIN_USERNAME=vagrant ADMIN_PASSWORD="""vagrant""" MACHINE_IP=#{local_public_ip} /log C:\\Windows\\Temp\\gardenwindows.log
       (New-Object System.Net.WebClient).DownloadFile('https://github.com/cloudfoundry/garden-windows-release/releases/download/v0.119/GardenWindows.msi', 'C:/Windows/Temp/GardenWindows.msi')
+      msiexec /passive /norestart /i C:\\Windows\\Temp\\GardenWindows.msi ADMIN_USERNAME=vagrant ADMIN_PASSWORD="""vagrant""" MACHINE_IP=#{local_public_ip} /log C:\\Windows\\Temp\\gardenwindows.log
 
       # Replace the Diego installed rep.exe with our special forked version
       Stop-Service RepService
