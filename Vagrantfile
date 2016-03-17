@@ -2,7 +2,7 @@
 # vi: set ft=ruby :
 
 Vagrant.configure(2) do |config|
-  config.vm.box = "windows2012r2"
+  config.vm.box = "mwrock/Windows2012R2"
 
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
@@ -10,6 +10,11 @@ Vagrant.configure(2) do |config|
   local_public_ip = ENV["WIN_PCFDEV_IP"] || "192.168.11.12"
 
   config.vm.network "private_network", ip: local_public_ip
+
+  config.vm.provider "virtualbox" do |v|
+    v.customize ["modifyvm", :id, "--memory", 2048]
+    v.customize ["modifyvm", :id, "--cpus", 2]
+  end
 
   config.vm.provision "shell", run: "once" do |s|
     s.inline = <<-SCRIPT
