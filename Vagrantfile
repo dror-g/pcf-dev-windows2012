@@ -1,16 +1,30 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
+pcfdev_public_ip = ENV["PCFDEV_IP"] || "192.168.11.11"
+local_public_ip = ENV["WIN_PCFDEV_IP"] || "192.168.11.12"
+
+# Configure the PCFDev instance to support a Windows cell
+#
+# 1. Grab the Consul certs and keys
+# 2. Reconfigure all services to bind to the host only adapter
+# 3. Add a windows2012R2 PCF stack
+script = <<-SCRIPT
+cf pcfdev start
+ssh -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip} "sudo ruby -e \\\"require 'json'; e = JSON.parse(IO.read('/var/vcap/jobs/consul_agent/config/config.json'))['encrypt']; IO.write('/var/vcap/jobs/consul_agent/config/certs/consul_encrypt.key', e)\\\""
+scp -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip}:/var/vcap/jobs/consul_agent/config/certs/consul_encrypt.key consul_encrypt.key
+scp -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip}:/var/vcap/jobs/consul_agent/config/certs/ca.crt consul_ca.crt
+scp -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip}:/var/vcap/jobs/consul_agent/config/certs/agent.crt consul_agent.crt
+scp -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip}:/var/vcap/jobs/consul_agent/config/certs/agent.key consul_agent.key
+ssh -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip} "sudo sed -i.bak \\\"s#^ip=.*#ip=\\\\\\$(ifconfig eth1 | awk -F ' *|:' '/inet addr/{print \\\\\\$4}')#g\\\" /var/pcfdev/run"
+ssh -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip} "echo -e \\\"default: cflinuxfs\\\\\\nstacks:\\\\\\n- description: Cloud Foundry Linux-based filesystem\\\\\\n  name: cflinuxfs2\\\\\\n- description: Windows Server 2012 R2\\\\\\n  name: windows2012R2\\\" | sudo tee /var/vcap/jobs/cloud_controller_ng/config/stacks.yml"
+cf pcfdev stop && cf pcfdev start
+SCRIPT
+system(script) if ARGV[0] == 'up'
+
 Vagrant.configure(2) do |config|
   config.vm.box = "mwrock/Windows2012R2"
-
-  config.vm.synced_folder ".", "/vagrant", disabled: true
-
-  pcfdev_public_ip = ENV["PCFDEV_IP"] || "192.168.11.11"
-  local_public_ip = ENV["WIN_PCFDEV_IP"] || "192.168.11.12"
-
   config.vm.network "private_network", ip: local_public_ip
-
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--memory", 2048]
     v.customize ["modifyvm", :id, "--cpus", 2]
@@ -77,7 +91,7 @@ Vagrant.configure(2) do |config|
       W32tm /config /manualpeerlist:pool.ntp.org /syncfromflags:MANUAL
       W32tm /config /update
 
-      Download-File 'https://raw.githubusercontent.com/sneal/garden-windows-release/configure-psremoting-only-if-disabled/scripts/setup.ps1' 'C:/Windows/Temp/setup.ps1'
+      Download-File 'https://github.com/cloudfoundry/garden-windows-release/releases/download/v0.149/setup.ps1' 'C:/Windows/Temp/setup.ps1'
       Write-Output "Executing setup.ps1 script"
       powershell.exe -File C:/Windows/Temp/setup.ps1 -quiet
       if ($LastExitCode -ne 0) {
@@ -85,13 +99,13 @@ Vagrant.configure(2) do |config|
         exit 1
       }
 
-      Download-File 'https://github.com/cloudfoundry/diego-windows-release/releases/download/v0.331/DiegoWindows.msi' 'C:/Windows/Temp/DiegoWindows.msi'
+      Download-File 'https://github.com/cloudfoundry/diego-windows-release/releases/download/v0.400/DiegoWindows.msi' 'C:/Windows/Temp/DiegoWindows.msi'
       Write-Output "Installing DiegoWindows"
-      msiexec /passive /norestart /i C:\\Windows\\Temp\\DiegoWindows.msi CONSUL_IPS=#{pcfdev_public_ip} CF_ETCD_CLUSTER=http://#{pcfdev_public_ip}:4001 STACK=windows2012R2 REDUNDANCY_ZONE=windows LOGGREGATOR_SHARED_SECRET=loggregator-secret MACHINE_IP=#{local_public_ip} /log C:\\Windows\\Temp\\diegowindows.log
+      msiexec /passive /norestart /i C:\\Windows\\Temp\\DiegoWindows.msi CONSUL_IPS=#{pcfdev_public_ip} CONSUL_DOMAIN=cf.internal CF_ETCD_CLUSTER=http://#{pcfdev_public_ip}:4001 STACK=windows2012R2 REDUNDANCY_ZONE=windows LOGGREGATOR_SHARED_SECRET=loggregator-secret MACHINE_IP=#{local_public_ip} CONSUL_ENCRYPT_FILE=C:\\vagrant\\consul_encrypt.key CONSUL_CA_FILE=C:\\vagrant\\consul_ca.crt CONSUL_AGENT_CERT_FILE=C:\\vagrant\\consul_agent.crt CONSUL_AGENT_KEY_FILE=C:\\vagrant\\consul_agent.key /log C:\\Windows\\Temp\\diegowindows.log
 
-      Download-File 'https://github.com/cloudfoundry/garden-windows-release/releases/download/v0.119/GardenWindows.msi' 'C:/Windows/Temp/GardenWindows.msi'
+      Download-File 'https://github.com/cloudfoundry/garden-windows-release/releases/download/v0.149/GardenWindows.msi' 'C:/Windows/Temp/GardenWindows.msi'
       Write-Output "Installing GardenWindows"
-      msiexec /passive /norestart /i C:\\Windows\\Temp\\GardenWindows.msi ADMIN_USERNAME=vagrant ADMIN_PASSWORD="""vagrant""" MACHINE_IP=#{local_public_ip} /log C:\\Windows\\Temp\\gardenwindows.log
+      msiexec /passive /norestart /i C:\\Windows\\Temp\\GardenWindows.msi MACHINE_IP=#{local_public_ip} /log C:\\Windows\\Temp\\gardenwindows.log
 
       # Replace the Diego installed rep.exe and RepService.exe with our special forked version
       # which supports a configurable listenAddr via MACHINE_IP
