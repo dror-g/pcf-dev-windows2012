@@ -17,7 +17,7 @@ scp -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip}:/var/vcap/j
 scp -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip}:/var/vcap/jobs/consul_agent/config/certs/agent.crt consul_agent.crt
 scp -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip}:/var/vcap/jobs/consul_agent/config/certs/agent.key consul_agent.key
 ssh -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip} "sudo sed -i.bak \\\"s#^ip=.*#ip=\\\\\\$(ifconfig eth1 | awk -F ' *|:' '/inet addr/{print \\\\\\$4}')#g\\\" /var/pcfdev/run"
-ssh -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip} "echo -e \\\"default: cflinuxfs\\\\\\nstacks:\\\\\\n- description: Cloud Foundry Linux-based filesystem\\\\\\n  name: cflinuxfs2\\\\\\n- description: Windows Server 2012 R2\\\\\\n  name: windows2012R2\\\" | sudo tee /var/vcap/jobs/cloud_controller_ng/config/stacks.yml"
+ssh -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip} "echo -e \\\"default: cflinuxfs2\\\\\\nstacks:\\\\\\n- description: Cloud Foundry Linux-based filesystem\\\\\\n  name: cflinuxfs2\\\\\\n- description: Windows Server 2012 R2\\\\\\n  name: windows2012R2\\\" | sudo tee /var/vcap/jobs/cloud_controller_ng/config/stacks.yml"
 cf pcfdev stop && cf pcfdev start
 SCRIPT
 system(script) if ARGV[0] == 'up'
