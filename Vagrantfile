@@ -4,23 +4,24 @@
 pcfdev_public_ip = ENV["PCFDEV_IP"] || "192.168.11.11"
 local_public_ip = ENV["WIN_PCFDEV_IP"] || "192.168.11.12"
 
+module OS
+  def OS.windows?
+    (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
+  end
+end
+
 # Configure the PCFDev instance to support a Windows cell
 #
 # 1. Grab the Consul certs and keys
 # 2. Reconfigure all services to bind to the host only adapter
 # 3. Add a windows2012R2 PCF stack
-script = <<-SCRIPT
-cf pcfdev start
-ssh -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip} "sudo ruby -e \\\"require 'json'; e = JSON.parse(IO.read('/var/vcap/jobs/consul_agent/config/config.json'))['encrypt']; IO.write('/var/vcap/jobs/consul_agent/config/certs/consul_encrypt.key', e)\\\""
-scp -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip}:/var/vcap/jobs/consul_agent/config/certs/consul_encrypt.key consul_encrypt.key
-scp -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip}:/var/vcap/jobs/consul_agent/config/certs/ca.crt consul_ca.crt
-scp -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip}:/var/vcap/jobs/consul_agent/config/certs/agent.crt consul_agent.crt
-scp -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip}:/var/vcap/jobs/consul_agent/config/certs/agent.key consul_agent.key
-ssh -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip} "sudo sed -i.bak \\\"s#^ip=.*#ip=\\\\\\$(ifconfig eth1 | awk -F ' *|:' '/inet addr/{print \\\\\\$4}')#g\\\" /var/pcfdev/run"
-ssh -i ~/.vagrant.d/insecure_private_key vagrant@#{pcfdev_public_ip} "echo -e \\\"default: cflinuxfs2\\\\\\nstacks:\\\\\\n- description: Cloud Foundry Linux-based filesystem\\\\\\n  name: cflinuxfs2\\\\\\n- description: Windows Server 2012 R2\\\\\\n  name: windows2012R2\\\" | sudo tee /var/vcap/jobs/cloud_controller_ng/config/stacks.yml"
-cf pcfdev stop && cf pcfdev start
-SCRIPT
-system(script) if ARGV[0] == 'up'
+if OS.windows? then
+  puts "Windows detected, running cmd script."
+  system("update_pcfdev_vm.cmd #{pcfdev_public_ip}") if ARGV[0] == 'up'
+else
+  puts "Non-Windows detected, running shell script."
+  system("./update_pcfdev_vm.sh #{pcfdev_public_ip}") if ARGV[0] == 'up'
+end
 
 Vagrant.configure(2) do |config|
   config.vm.box = "mwrock/Windows2012R2"
@@ -99,27 +100,27 @@ Vagrant.configure(2) do |config|
         exit 1
       }
 
-      Download-File 'https://github.com/cloudfoundry/diego-windows-release/releases/download/v0.400/DiegoWindows.msi' 'C:/Windows/Temp/DiegoWindows.msi'
+      Download-File 'https://github.com/cloudfoundry/diego-windows-release/releases/download/v0.411/DiegoWindows.msi' 'C:/Windows/Temp/DiegoWindows.msi'
       Write-Output "Installing DiegoWindows"
       msiexec /passive /norestart /i C:\\Windows\\Temp\\DiegoWindows.msi CONSUL_IPS=#{pcfdev_public_ip} CONSUL_DOMAIN=cf.internal CF_ETCD_CLUSTER=http://#{pcfdev_public_ip}:4001 STACK=windows2012R2 REDUNDANCY_ZONE=windows LOGGREGATOR_SHARED_SECRET=loggregator-secret MACHINE_IP=#{local_public_ip} CONSUL_ENCRYPT_FILE=C:\\vagrant\\consul_encrypt.key CONSUL_CA_FILE=C:\\vagrant\\consul_ca.crt CONSUL_AGENT_CERT_FILE=C:\\vagrant\\consul_agent.crt CONSUL_AGENT_KEY_FILE=C:\\vagrant\\consul_agent.key /log C:\\Windows\\Temp\\diegowindows.log
 
-      Download-File 'https://github.com/cloudfoundry/garden-windows-release/releases/download/v0.149/GardenWindows.msi' 'C:/Windows/Temp/GardenWindows.msi'
+      Download-File 'https://github.com/cloudfoundry/garden-windows-release/releases/download/v0.153/GardenWindows.msi' 'C:/Windows/Temp/GardenWindows.msi'
       Write-Output "Installing GardenWindows"
       msiexec /passive /norestart /i C:\\Windows\\Temp\\GardenWindows.msi MACHINE_IP=#{local_public_ip} /log C:\\Windows\\Temp\\gardenwindows.log
 
       # Replace the Diego installed rep.exe and RepService.exe with our special forked version
       # which supports a configurable listenAddr via MACHINE_IP
-      Service-Stop 'RepService'
+      Service-Stop 'CF Rep'
       Download-File 'https://github.com/sneal/rep/releases/download/NAT/rep.exe' 'C:/Program Files/CloudFoundry/DiegoWindows/rep.exe'
       Download-File 'https://github.com/sneal/diego-windows-release/releases/download/NAT/RepService.exe' 'C:/Program Files/CloudFoundry/DiegoWindows/RepService.exe'
-      Service-Start 'RepService'
+      Service-Start 'CF Rep'
 
       # Ensure all the CloudFoundry Windows services are installed and running
-      Check-Service-Running "ConsulService"
-      Check-Service-Running "ContainerizerService"
-      Check-Service-Running "GardenWindowsService"
-      Check-Service-Running "MetronService"
-      Check-Service-Running "RepService"
+      Check-Service-Running "CF Consul"
+      Check-Service-Running "CF Containerizer"
+      Check-Service-Running "CF GardenWindows"
+      Check-Service-Running "CF Metron"
+      Check-Service-Running "CF Rep"
     SCRIPT
   end
 end
