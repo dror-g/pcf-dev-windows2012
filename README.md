@@ -4,7 +4,9 @@ Updated to work on Windows w/Vagrant as the pre-load script was escaped for sh. 
 
 Pre-reqs
 --------
-* https://github.com/pivotal-cf/pcfdev installed
+* Vagrant http://vagrantup.com/
+* Virtual Box - https://www.virtualbox.org/wiki/Downloads
+* Pivotal Cloud Foundry Dev - https://github.com/pivotal-cf/pcfdev
 * ssh/scp available on command line (for Windows too)
 
 Running

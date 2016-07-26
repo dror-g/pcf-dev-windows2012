@@ -15,12 +15,14 @@ end
 # 1. Grab the Consul certs and keys
 # 2. Reconfigure all services to bind to the host only adapter
 # 3. Add a windows2012R2 PCF stack
-if OS.windows? then
-  puts "Windows detected, running cmd script."
-  system("update_pcfdev_vm.cmd #{pcfdev_public_ip}") if ARGV[0] == 'up'
-else
-  puts "Non-Windows detected, running shell script."
-  system("./update_pcfdev_vm.sh #{pcfdev_public_ip}") if ARGV[0] == 'up'
+if ARGV[0] == 'up' then
+    if OS.windows? then
+          puts "Windows detected, running cmd script."
+          system("update_pcfdev_vm.cmd #{pcfdev_public_ip}")
+    else
+      puts "Non-Windows detected, running shell script."
+      system("./update_pcfdev_vm.sh #{pcfdev_public_ip}")
+    end
 end
 
 Vagrant.configure(2) do |config|
